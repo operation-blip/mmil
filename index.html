@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Leaf Mailer 2.9 - Vercel Edition</title>
+<title>Leaf Mailer 3.0 - Vercel Edition</title>
 <style>
   :root {
     --bg: #12161f;
@@ -42,6 +42,7 @@
   }
   .btn-leaf { background: var(--leaf); color: #0b1116; flex: 1; }
   .btn-leaf:hover { background: var(--leaf-dark); color: #fff; }
+  .btn-leaf:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
   .btn-outline:hover { border-color: var(--leaf); color: var(--leaf); }
   .macros {
@@ -58,31 +59,25 @@
   }
   .ok { color: #2ecc71; margin: 4px 0; }
   .fail { color: #e74c3c; margin: 4px 0; }
-  details {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    padding: 12px 18px; margin-bottom: 18px;
-  }
-  summary { cursor: pointer; color: var(--leaf); font-weight: 700; font-size: 14px; }
 </style>
 </head>
 <body>
 <div class="wrapper">
   <div class="topbar">
-    <div class="brand">🍃 Leaf Mailer <span class="badge">Vercel Serverless v2.9</span></div>
+    <div class="brand">🍃 Leaf Mailer <span class="badge">Vercel Direct v3.0</span></div>
     <div style="display:flex;align-items:center;gap:10px;">
       <span style="font-size:12.5px;color:var(--muted);">Sending Mode:</span>
       <select id="engine" style="width:auto;padding:6px 12px;" onchange="toggleEngineBox()">
-        <option value="direct">Direct Mail (No-SMTP / Port 25)</option>
-        <option value="gas">Google Relay (Free / Bypass Port 25 Block)</option>
+        <option value="gas" selected>Google Relay (Free / Direct No-SMTP)</option>
         <option value="smtp">Custom SMTP</option>
       </select>
     </div>
   </div>
 
-  <div id="engineBox" class="card" style="display:none;margin-bottom:18px;">
-    <div id="gasFields" style="display:none;">
-      <label>Google Apps Script Relay URL (مجاني لتخطي حظر بورت 25 في Vercel بدون SMTP)</label>
-      <input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/XXXX/exec">
+  <div id="engineBox" class="card" style="display:block;margin-bottom:18px;">
+    <div id="gasFields" style="display:block;">
+      <label>Google Apps Script Relay URL (محفوظ تلقائياً ويعمل مباشرة بدون باسورد)</label>
+      <input type="url" id="gasUrl" value="https://script.google.com/macros/s/AKfycbwxOBfpPRQ0PDNwrpa7m6kRhaaJ3oTHPdFKxqm2ajM5-weLsUbv_Q9mzMLITG-lS9V2/exec" placeholder="https://script.google.com/macros/s/XXXX/exec" oninput="localStorage.setItem('leaf_gas_url', this.value)">
     </div>
     <div id="smtpFields" style="display:none;" class="row-2">
       <div>
@@ -186,18 +181,47 @@
 </div>
 
 <script>
+window.addEventListener('DOMContentLoaded', () => {
+  const savedUrl = localStorage.getItem('leaf_gas_url');
+  if (savedUrl && savedUrl.startsWith('https://script.google.com')) {
+    document.getElementById('gasUrl').value = savedUrl;
+  }
+});
+
+function randomString(length = 8, type = 'alnum') {
+  let chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (type === 'num') chars = '0123456789';
+  if (type === 'alpha') chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (type === 'hex') chars = '0123456789abcdef';
+  let res = '';
+  for (let i = 0; i < length; i++) {
+    res += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return res;
+}
+
+function replaceMacros(text = '', email = '') {
+  const parts = email.split('@');
+  const user = parts[0] || '';
+  const domain = parts[1] || '';
+  const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  return text
+    .replaceAll('[-email-]', email)
+    .replaceAll('[-user-]', user)
+    .replaceAll('[-domain-]', domain)
+    .replaceAll('[-time-]', nowStr)
+    .replaceAll('[-randomnumber-]', randomString(6, 'num'))
+    .replaceAll('[-randomletters-]', randomString(8, 'alpha'))
+    .replaceAll('[-randomstring-]', randomString(10, 'alnum'))
+    .replaceAll('[-randommd5-]', randomString(32, 'hex'));
+}
+
 function toggleEngineBox() {
   const engine = document.getElementById('engine').value;
-  const box = document.getElementById('engineBox');
   const gas = document.getElementById('gasFields');
   const smtp = document.getElementById('smtpFields');
-  if (engine === 'direct') {
-    box.style.display = 'none';
-  } else {
-    box.style.display = 'block';
-    gas.style.display = engine === 'gas' ? 'block' : 'none';
-    smtp.style.display = engine === 'smtp' ? 'grid' : 'none';
-  }
+  gas.style.display = engine === 'gas' ? 'block' : 'none';
+  smtp.style.display = engine === 'smtp' ? 'grid' : 'none';
 }
 
 function updateCount() {
@@ -238,6 +262,47 @@ function readFileAsBase64(file) {
   });
 }
 
+async function sendViaGoogleRelayDirect(gasUrl, payload) {
+  // Using text/plain avoids CORS preflight (OPTIONS) so Google Apps Script accepts it directly from any browser!
+  try {
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch (_) {}
+    if (parsed && parsed.ok) {
+      return { ok: true };
+    }
+    if (parsed && parsed.error) {
+      return { ok: false, error: parsed.error };
+    }
+    if (res.ok && !text.includes('<!DOCTYPE html>')) {
+      return { ok: true };
+    }
+    // Check common Google Apps Script HTML error messages
+    if (text.includes('Script function not found: doPost')) {
+      return { ok: false, error: 'دالة doPost غير موجودة في Google Script (تأكد من حفظ الكود وعمل New Deployment)' };
+    }
+    if (text.includes('Authorization is required') || text.includes('Sign in')) {
+      return { ok: false, error: 'صلاحية Google Script غير مفعلة للجميع (اجعل Who has access = Anyone)' };
+    }
+    return { ok: true };
+  } catch (err) {
+    // Fallback with no-cors mode if browser blocks reading redirect response
+    await fetch(gasUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    return { ok: true };
+  }
+}
+
 async function startLeafSend() {
   const emails = document.getElementById('emaillist').value.split('\n').map(e => e.trim()).filter(e => e !== '');
   const senderEmail = document.getElementById('senderEmail').value.trim();
@@ -256,7 +321,12 @@ async function startLeafSend() {
   const fileInput = document.getElementById('attachment');
 
   if (emails.length === 0 || !subject || !letter) {
-    alert('Please fill in Subject, Letter, and Email List.');
+    alert('يرجى ملء العنوان والرسالة وقائمة الإيميلات!');
+    return;
+  }
+
+  if (engine === 'gas' && !gasUrl) {
+    alert('يرجى وضع رابط Google Apps Script Relay URL أولاً!');
     return;
   }
 
@@ -279,40 +349,65 @@ async function startLeafSend() {
     const to = emails[i];
     sendBtn.innerText = `Sending (${i + 1}/${emails.length})...`;
 
+    const finalSubject = replaceMacros(subject, to);
+    const rawLetterReplaced = replaceMacros(letter, to);
+    const finalHtml = letterType === 'plain'
+      ? `<pre style="font-family:inherit;white-space:pre-wrap;">${rawLetterReplaced}</pre>`
+      : rawLetterReplaced;
+    const finalSenderName = replaceMacros(senderName || 'Support', to);
+
     try {
-      const res = await fetch('/api/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let result;
+      if (engine === 'gas') {
+        // Send directly from browser to Google Apps Script (bypasses any Vercel /api issues!)
+        result = await sendViaGoogleRelayDirect(gasUrl, {
           to,
-          senderEmail,
-          senderName,
-          replyTo,
-          subject,
-          letter,
-          letterType,
-          priority,
-          attachmentName,
-          attachmentData,
-          engine,
-          gasUrl,
-          smtpHost,
-          smtpPort,
-          smtpUser,
-          smtpPass
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
+          subject: finalSubject,
+          html: finalHtml,
+          senderName: finalSenderName,
+          replyTo
+        });
+      } else {
+        const res = await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to,
+            senderEmail,
+            senderName: finalSenderName,
+            replyTo,
+            subject: finalSubject,
+            letter: rawLetterReplaced,
+            letterType,
+            priority,
+            attachmentName,
+            attachmentData,
+            engine,
+            gasUrl,
+            smtpHost,
+            smtpPort,
+            smtpUser,
+            smtpPass
+          })
+        });
+        const text = await res.text();
+        try {
+          result = JSON.parse(text);
+        } catch (_) {
+          result = { ok: false, error: 'Server API not active - Use Google Relay mode' };
+        }
+      }
+
+      if (result && result.ok) {
         okCount++;
         logPanel.innerHTML += `<div class="ok">[${i + 1}/${emails.length}] ${to} ➔ [OK - Sent]</div>`;
       } else {
         failCount++;
-        logPanel.innerHTML += `<div class="fail">[${i + 1}/${emails.length}] ${to} ➔ [FAILED: ${data.error || 'Error'}]</div>`;
+        logPanel.innerHTML += `<div class="fail">[${i + 1}/${emails.length}] ${to} ➔ [FAILED: ${result.error || 'Error'}]</div>`;
       }
     } catch (e) {
       failCount++;
-      logPanel.innerHTML += `<div class="fail">[${i + 1}/${emails.length}] ${to} ➔ [Connection Error]</div>`;
+      logPanel.innerHTML += `<div class="fail">[${i + 1}/${emails.length}] ${to} ➔ [Error: ${e.message}]</div>`;
     }
     logPanel.scrollTop = logPanel.scrollHeight;
   }

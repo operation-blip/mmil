@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leaf Mailer 2.9 - Vercel Edition</title>
+<style>
+  :root {
+    --bg: #12161f;
+    --panel: #1b2230;
+    --input: #0f131c;
+    --leaf: #2ecc71;
+    --leaf-dark: #27ae60;
+    --border: #2c364c;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+  body { background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+  .wrapper { max-width: 1150px; margin: 0 auto; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); padding: 14px 22px; border-radius: 10px;
+    border: 1px solid var(--border); margin-bottom: 18px; flex-wrap: wrap; gap: 10px;
+  }
+  .brand { font-size: 22px; font-weight: 800; color: var(--leaf); display: flex; align-items: center; gap: 8px; }
+  .badge { background: rgba(46,204,113,0.15); color: var(--leaf); padding: 4px 10px; border-radius: 6px; font-size: 12px; }
+  .main-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; }
+  @media (max-width: 850px) { .main-grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  label { display: block; font-size: 12.5px; color: var(--muted); margin: 10px 0 5px; font-weight: 600; }
+  input, select, textarea {
+    width: 100%; background: var(--input); border: 1px solid var(--border);
+    color: var(--text); padding: 10px; border-radius: 6px; font-size: 13.5px;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--leaf); }
+  .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+  button {
+    padding: 11px 16px; border-radius: 6px; border: none; font-weight: 700;
+    cursor: pointer; font-size: 14px; transition: 0.2s;
+  }
+  .btn-leaf { background: var(--leaf); color: #0b1116; flex: 1; }
+  .btn-leaf:hover { background: var(--leaf-dark); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--leaf); color: var(--leaf); }
+  .macros {
+    margin-top: 14px; background: var(--input); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px; font-size: 12px; line-height: 1.8; direction: rtl; text-align: right;
+  }
+  .macro-tag {
+    display: inline-block; background: #232d3f; color: var(--leaf);
+    padding: 2px 7px; border-radius: 4px; font-family: monospace; margin: 2px; cursor: pointer; direction: ltr;
+  }
+  .log-panel {
+    margin-top: 18px; background: var(--input); border: 1px solid var(--border);
+    border-radius: 10px; padding: 15px; max-height: 260px; overflow-y: auto; font-family: monospace; font-size: 13px;
+  }
+  .ok { color: #2ecc71; margin: 4px 0; }
+  .fail { color: #e74c3c; margin: 4px 0; }
+  details {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 18px; margin-bottom: 18px;
+  }
+  summary { cursor: pointer; color: var(--leaf); font-weight: 700; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="topbar">
+    <div class="brand">🍃 Leaf Mailer <span class="badge">Vercel Serverless v2.9</span></div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:12.5px;color:var(--muted);">Sending Mode:</span>
+      <select id="engine" style="width:auto;padding:6px 12px;" onchange="toggleEngineBox()">
+        <option value="direct">Direct Mail (No-SMTP / Port 25)</option>
+        <option value="gas">Google Relay (Free / Bypass Port 25 Block)</option>
+        <option value="smtp">Custom SMTP</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="engineBox" class="card" style="display:none;margin-bottom:18px;">
+    <div id="gasFields" style="display:none;">
+      <label>Google Apps Script Relay URL (مجاني لتخطي حظر بورت 25 في Vercel بدون SMTP)</label>
+      <input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/XXXX/exec">
+    </div>
+    <div id="smtpFields" style="display:none;" class="row-2">
+      <div>
+        <label>SMTP Host & Port</label>
+        <div class="row-2">
+          <input type="text" id="smtpHost" value="smtp.gmail.com" placeholder="smtp.gmail.com">
+          <input type="number" id="smtpPort" value="465" placeholder="465">
+        </div>
+      </div>
+      <div>
+        <label>SMTP User & Password</label>
+        <div class="row-2">
+          <input type="text" id="smtpUser" placeholder="user@domain.com">
+          <input type="password" id="smtpPass" placeholder="Password">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Left Column: Sender & Letter -->
+    <div class="card">
+      <div class="row-2">
+        <div>
+          <label>Sender Email</label>
+          <input type="text" id="senderEmail" placeholder="info@company.com" value="info@company.com">
+        </div>
+        <div>
+          <label>Sender Name</label>
+          <input type="text" id="senderName" placeholder="Customer Support" value="Support">
+        </div>
+      </div>
+
+      <div class="row-2">
+        <div>
+          <label>Reply-To (Optional)</label>
+          <input type="text" id="replyTo" placeholder="reply@company.com">
+        </div>
+        <div>
+          <label>Attachment (Optional)</label>
+          <input type="file" id="attachment">
+        </div>
+      </div>
+
+      <label>Subject</label>
+      <input type="text" id="subject" placeholder="Hello [-user-] - Important Update [[-randomnumber-]]">
+
+      <div class="row-2">
+        <div>
+          <label>Letter Type</label>
+          <select id="letterType">
+            <option value="html">HTML</option>
+            <option value="plain">Plain Text</option>
+          </select>
+        </div>
+        <div>
+          <label>Priority</label>
+          <select id="priority">
+            <option value="3">Normal</option>
+            <option value="1">High</option>
+            <option value="5">Low</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Email Letter (HTML / Text)</label>
+      <textarea id="letter" rows="9" placeholder="<h1>Hello [-email-]</h1><p>Write your HTML or plain text letter here...</p>"></textarea>
+
+      <div class="btn-group">
+        <button class="btn-leaf" id="sendBtn" onclick="startLeafSend()">▶ Send Emails</button>
+        <button class="btn-outline" onclick="previewLetter()">👁 Preview Letter</button>
+      </div>
+    </div>
+
+    <!-- Right Column: Email List & Macros -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <label style="margin:0;">Email List (<span id="countBadge">0</span>)</label>
+        <div>
+          <button class="btn-outline" style="padding:4px 10px;font-size:12px;" onclick="extractEmails()">🔍 Filter / Extract</button>
+          <button class="btn-outline" style="padding:4px 10px;font-size:12px;" onclick="clearList()">🗑 Clear</button>
+        </div>
+      </div>
+      <textarea id="emaillist" rows="12" style="margin-top:8px;" oninput="updateCount()" placeholder="client1@example.com&#10;client2@example.com"></textarea>
+
+      <div class="macros">
+        <b style="color:var(--text);display:block;margin-bottom:4px;">أكواد Leaf Mailer التلقائية (اضغط على أي كود لنسخه):</b>
+        <span class="macro-tag" onclick="copyMacro('[-email-]')">[-email-]</span> إيميل المستلم بالكامل<br>
+        <span class="macro-tag" onclick="copyMacro('[-user-]')">[-user-]</span> اسم المستلم قبل علامة @<br>
+        <span class="macro-tag" onclick="copyMacro('[-domain-]')">[-domain-]</span> دومين المستلم بعد @<br>
+        <span class="macro-tag" onclick="copyMacro('[-time-]')">[-time-]</span> التاريخ والوقت الحالي<br>
+        <span class="macro-tag" onclick="copyMacro('[-randomnumber-]')">[-randomnumber-]</span> رقم عشوائي متغير لكل رسالة<br>
+        <span class="macro-tag" onclick="copyMacro('[-randomstring-]')">[-randomstring-]</span> حروف وأرقام عشوائية<br>
+        <span class="macro-tag" onclick="copyMacro('[-randommd5-]')">[-randommd5-]</span> كود MD5 عشوائي
+      </div>
+    </div>
+  </div>
+
+  <div id="previewModal" class="card" style="display:none;margin-top:18px;background:#fff;color:#000;"></div>
+  <div id="logPanel" class="log-panel" style="display:none;"></div>
+</div>
+
+<script>
+function toggleEngineBox() {
+  const engine = document.getElementById('engine').value;
+  const box = document.getElementById('engineBox');
+  const gas = document.getElementById('gasFields');
+  const smtp = document.getElementById('smtpFields');
+  if (engine === 'direct') {
+    box.style.display = 'none';
+  } else {
+    box.style.display = 'block';
+    gas.style.display = engine === 'gas' ? 'block' : 'none';
+    smtp.style.display = engine === 'smtp' ? 'grid' : 'none';
+  }
+}
+
+function updateCount() {
+  const raw = document.getElementById('emaillist').value;
+  const list = raw.split('\n').map(e => e.trim()).filter(e => e !== '');
+  document.getElementById('countBadge').innerText = list.length;
+}
+
+function extractEmails() {
+  const raw = document.getElementById('emaillist').value;
+  const matches = raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+  const unique = [...new Set(matches.map(e => e.toLowerCase()))];
+  document.getElementById('emaillist').value = unique.join('\n');
+  updateCount();
+}
+
+function clearList() {
+  document.getElementById('emaillist').value = '';
+  updateCount();
+}
+
+function copyMacro(tag) {
+  navigator.clipboard.writeText(tag);
+}
+
+function previewLetter() {
+  const modal = document.getElementById('previewModal');
+  modal.style.display = modal.style.display === 'none' ? 'block' : 'none';
+  modal.innerHTML = document.getElementById('letter').value || '<em>Empty letter</em>';
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function startLeafSend() {
+  const emails = document.getElementById('emaillist').value.split('\n').map(e => e.trim()).filter(e => e !== '');
+  const senderEmail = document.getElementById('senderEmail').value.trim();
+  const senderName = document.getElementById('senderName').value.trim();
+  const replyTo = document.getElementById('replyTo').value.trim();
+  const subject = document.getElementById('subject').value;
+  const letter = document.getElementById('letter').value;
+  const letterType = document.getElementById('letterType').value;
+  const priority = document.getElementById('priority').value;
+  const engine = document.getElementById('engine').value;
+  const gasUrl = document.getElementById('gasUrl').value.trim();
+  const smtpHost = document.getElementById('smtpHost').value.trim();
+  const smtpPort = document.getElementById('smtpPort').value.trim();
+  const smtpUser = document.getElementById('smtpUser').value.trim();
+  const smtpPass = document.getElementById('smtpPass').value.trim();
+  const fileInput = document.getElementById('attachment');
+
+  if (emails.length === 0 || !subject || !letter) {
+    alert('Please fill in Subject, Letter, and Email List.');
+    return;
+  }
+
+  let attachmentData = '';
+  let attachmentName = '';
+  if (fileInput.files.length > 0) {
+    attachmentName = fileInput.files[0].name;
+    attachmentData = await readFileAsBase64(fileInput.files[0]);
+  }
+
+  const sendBtn = document.getElementById('sendBtn');
+  const logPanel = document.getElementById('logPanel');
+  sendBtn.disabled = true;
+  logPanel.style.display = 'block';
+  logPanel.innerHTML = `<div>🍃 Leaf Mailer started (${emails.length} emails)...</div>`;
+
+  let okCount = 0, failCount = 0;
+
+  for (let i = 0; i < emails.length; i++) {
+    const to = emails[i];
+    sendBtn.innerText = `Sending (${i + 1}/${emails.length})...`;
+
+    try {
+      const res = await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to,
+          senderEmail,
+          senderName,
+          replyTo,
+          subject,
+          letter,
+          letterType,
+          priority,
+          attachmentName,
+          attachmentData,
+          engine,
+          gasUrl,
+          smtpHost,
+          smtpPort,
+          smtpUser,
+          smtpPass
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        okCount++;
+        logPanel.innerHTML += `<div class="ok">[${i + 1}/${emails.length}] ${to} ➔ [OK - Sent]</div>`;
+      } else {
+        failCount++;
+        logPanel.innerHTML += `<div class="fail">[${i + 1}/${emails.length}] ${to} ➔ [FAILED: ${data.error || 'Error'}]</div>`;
+      }
+    } catch (e) {
+      failCount++;
+      logPanel.innerHTML += `<div class="fail">[${i + 1}/${emails.length}] ${to} ➔ [Connection Error]</div>`;
+    }
+    logPanel.scrollTop = logPanel.scrollHeight;
+  }
+
+  logPanel.innerHTML += `<hr style="border-color:#2c364c"><div>✅ Finished! Sent: ${okCount} | Failed: ${failCount}</div>`;
+  sendBtn.disabled = false;
+  sendBtn.innerText = '▶ Send Emails';
+}
+</script>
+</body>
+</html>

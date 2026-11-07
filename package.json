@@ -1,0 +1,9 @@
+{
+  "name": "leaf-mailer-vercel",
+  "version": "2.9.0",
+  "description": "Leaf Mailer Web Edition for Vercel",
+  "type": "module",
+  "dependencies": {
+    "nodemailer": "^6.9.15"
+  }
+}
